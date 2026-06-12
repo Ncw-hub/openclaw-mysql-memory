@@ -32,6 +32,26 @@ npm install mysql2 ioredis
 
 ## ⚙️ 配置说明
 
+### 接管源生记忆（必需）
+
+启用此插件后，可以完全接管 OpenClaw 源生的文件记忆系统。在 `openclaw.json` 中添加以下配置：
+
+```json
+{
+  "plugins": {
+    "slots": {
+      "memory": "mysql-memory"
+    }
+  }
+}
+```
+
+**效果说明**：
+- 设置 `plugins.slots.memory` 为 `"mysql-memory"` 后，OpenClaw 内置的文件记忆（`MEMORY.md`、`memory/` 目录等）将被 MySQL 记忆完全替代
+- 所有 `memory_store` / `memory_recall` / `memory_forget` 工具调用都走 MySQL 存储
+- 用户无需再手动管理 `MEMORY.md` 文件
+- 记忆持久化到 MySQL，支持向量检索，不再因文件丢失而失效
+
 在 `openclaw.json` 中配置插件：
 
 ```json

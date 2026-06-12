@@ -1,0 +1,2 @@
+// store/ — MySQL storage and Redis cache (Phase 2)
+// Files: mysql-store.js, redis-cache.js

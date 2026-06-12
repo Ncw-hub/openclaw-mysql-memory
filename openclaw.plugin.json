@@ -1,0 +1,99 @@
+{
+  "id": "mysql-memory",
+  "version": "2026.5.28",
+  "kind": "memory",
+  "name": "MySQL Memory",
+  "description": "MySQL-backed long-term memory with Redis cache and Ollama embeddings",
+  "commandAliases": [{ "name": "ltm" }],
+  "activation": {
+    "onStartup": false,
+    "onCommands": ["ltm"]
+  },
+  "contracts": {
+    "tools": ["memory_store", "memory_recall", "memory_forget"]
+  },
+  "hooks": {
+    "allowConversationAccess": true
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "mysql": {
+        "type": "object",
+        "required": ["host", "port", "database", "user", "password"],
+        "properties": {
+          "host": { "type": "string" },
+          "port": { "type": "number" },
+          "database": { "type": "string" },
+          "user": { "type": "string" },
+          "password": { "type": "string" },
+          "connectionLimit": { "type": "number", "default": 10, "minimum": 1, "maximum": 100 },
+          "connectTimeout": { "type": "number", "default": 5000, "minimum": 1000, "maximum": 30000 },
+          "queryTimeout": { "type": "number", "default": 10000, "minimum": 1000, "maximum": 60000 },
+          "ddlTimeout": { "type": "number", "default": 30000, "minimum": 5000, "maximum": 120000 }
+        }
+      },
+      "redis": {
+        "type": "object",
+        "properties": {
+          "host": { "type": "string", "default": "localhost" },
+          "port": { "type": "number", "default": 6379 },
+          "password": { "type": "string", "default": "" },
+          "db": { "type": "number", "default": 0 },
+          "enabled": { "type": "boolean", "default": true },
+          "connectTimeout": { "type": "number", "default": 2000, "minimum": 500, "maximum": 10000 },
+          "commandTimeout": { "type": "number", "default": 3000, "minimum": 500, "maximum": 15000 },
+          "maxRetries": { "type": "number", "default": 3, "minimum": 0, "maximum": 10 }
+        }
+      },
+      "embedding": {
+        "type": "object",
+        "properties": {
+          "model": { "type": "string", "default": "nomic-embed-text:latest" },
+          "baseUrl": { "type": "string", "default": "http://localhost:11434" },
+          "dimensions": { "type": "number", "default": 768 },
+          "timeoutMs": { "type": "number", "default": 10000, "minimum": 1000, "maximum": 30000 },
+          "maxChars": { "type": "number", "default": 2000, "minimum": 500, "maximum": 8000 }
+        }
+      },
+      "autoCapture": { "type": "boolean", "default": true },
+      "autoRecall": { "type": "boolean", "default": true },
+      "autoRecallTimeout": { "type": "number", "default": 15000, "minimum": 5000, "maximum": 60000 },
+      "captureMaxChars": { "type": "number", "default": 500, "minimum": 100, "maximum": 10000 },
+      "recallMaxChars": { "type": "number", "default": 1000, "minimum": 100, "maximum": 10000 },
+      "similarityThreshold": { "type": "number", "default": 0.95, "minimum": 0, "maximum": 1 },
+      "candidateLimit": { "type": "number", "default": 50, "minimum": 10, "maximum": 200 },
+      "recallLimit": { "type": "number", "default": 3, "minimum": 1, "maximum": 20 },
+      "recallMinScore": { "type": "number", "default": 0.3, "minimum": 0, "maximum": 1 },
+      "maxCapturesPerTurn": { "type": "number", "default": 5, "minimum": 1, "maximum": 20 },
+      "storeOnEmbedFailure": { "type": "boolean", "default": true },
+      "isolateAgents": { "type": "boolean", "default": false },
+      "agentScopes": { "type": "object" },
+      "scopes": { "type": "object" },
+      "cache": {
+        "type": "object",
+        "properties": {
+          "recallCacheTTL": { "type": "number", "default": 300, "minimum": 60, "maximum": 3600 },
+          "maxCacheEntries": { "type": "number", "default": 1000, "minimum": 100, "maximum": 10000 }
+        }
+      },
+      "noiseFilter": {
+        "type": "object",
+        "properties": {
+          "enabled": { "type": "boolean", "default": false },
+          "expandFactor": { "type": "number", "default": 2.0, "minimum": 1.0, "maximum": 10.0 },
+          "maxExpandedCandidates": { "type": "number", "default": 100, "minimum": 10, "maximum": 500 }
+        }
+      },
+      "recencyRerank": {
+        "type": "object",
+        "properties": {
+          "enabled": { "type": "boolean", "default": false },
+          "halfLifeDays": { "type": "number", "default": 14, "minimum": 1, "maximum": 365 },
+          "weight": { "type": "number", "default": 0.15, "minimum": 0, "maximum": 1 }
+        }
+      }
+    }
+  }
+}

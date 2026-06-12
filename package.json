@@ -1,6 +1,6 @@
 {
   "name": "mysql-memory",
-  "version": "2026.6.5",
+  "version": "2026.6.6",
   "description": "MySQL-backed long-term memory with Redis cache and Ollama embeddings",
   "type": "module",
   "dependencies": {

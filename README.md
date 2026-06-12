@@ -19,7 +19,15 @@
 
 将插件克隆到 OpenClaw 的 `extensions` 目录：
 
+#### Windows:
 ```bash
+cd %USERPROFILE%\.openclaw\extensions
+git clone https://github.com/Ncw-hub/openclaw-mysql-memory.git mysql-memory
+```
+
+#### Linux/macOS:
+```bash
+cd ~/.openclaw/extensions
 git clone https://github.com/Ncw-hub/openclaw-mysql-memory.git mysql-memory
 ```
 
@@ -33,7 +41,7 @@ npm install mysql2 ioredis
 
 ## ⚙️ 配置说明
 
-### 接管源生记忆（必需）
+### 接管源生记忆（非必需）
 
 启用此插件后，可以完全接管 OpenClaw 源生的文件记忆系统。在 `openclaw.json` 中添加以下配置：
 

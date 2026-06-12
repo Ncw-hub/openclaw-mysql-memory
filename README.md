@@ -68,7 +68,7 @@ npm install mysql2 ioredis
 **自动建表特性**：
 - 根据 `openclaw.json` 中的 `embedding.dimensions` 配置自动适配向量维度
 - 如果表已存在，会检查并补充缺失的列（如 `agent_id`、`scope_key`）
-- 需要确保 MySQL 版本支持 VECTOR 类型（MySQL 9.0+）
+- 需要确保 MySQL 版本支持 VECTOR 类型（MySQL 9.7.0+）
 - 需要确保配置中的 MySQL 用户有 `CREATE TABLE` 和 `ALTER TABLE` 权限
 
 在 `openclaw.json` 中配置插件：

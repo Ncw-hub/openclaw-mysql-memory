@@ -1,0 +1,22 @@
+{
+  "name": "mysql-memory",
+  "version": "2026.6.5",
+  "description": "MySQL-backed long-term memory with Redis cache and Ollama embeddings",
+  "type": "module",
+  "dependencies": {
+    "ioredis": "^5.4.1",
+    "mysql2": "^3.11.4",
+    "typebox": "1.1.38"
+  },
+  "devDependencies": {
+    "better-sqlite3": "^11.10.0"
+  },
+  "openclaw": {
+    "extensions": [
+      "./index.js"
+    ],
+    "compat": {
+      "pluginApi": ">=2026.4.10"
+    }
+  }
+}

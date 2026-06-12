@@ -17,9 +17,10 @@
 
 ### 从 GitHub 安装
 
+将插件克隆到 OpenClaw 的 `extensions` 目录：
+
 ```bash
-cd "C:\Users\Administrator\.openclaw\extensions"
-git clone https://github.com/your-username/mysql-memory.git mysql-memory
+git clone https://github.com/Ncw-hub/openclaw-mysql-memory.git mysql-memory
 ```
 
 ### 确保依赖已安装

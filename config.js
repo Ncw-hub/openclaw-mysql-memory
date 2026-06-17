@@ -260,7 +260,7 @@ export function parseConfig(value) {
     recallMinScore,
     maxCapturesPerTurn,
     storeOnEmbedFailure,
-    cleanupMaxAgeDays: typeof cfg.cleanupMaxAgeDays === "number" ? Math.max(1, Math.min(365, cfg.cleanupMaxAgeDays)) : 30,
+    cleanupMaxAgeDays: typeof cfg.cleanupMaxAgeDays === "number" ? Math.max(0, Math.min(365, cfg.cleanupMaxAgeDays)) : 0,
     // Agent isolation
     isolateAgents: cfg.isolateAgents === true,
     agentScopes: cfg.agentScopes && typeof cfg.agentScopes === "object" ? cfg.agentScopes : null,

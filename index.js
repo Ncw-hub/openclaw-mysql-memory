@@ -433,7 +433,9 @@ export default {
       if (nextCursorKey) autoCaptureCursors.delete(nextCursorKey);
 
       // H1: auto-cleanup old memories on session end (fire-and-forget, non-blocking)
-      store.cleanup({ maxAgeDays: cfg.cleanupMaxAgeDays ?? 30 }).catch(() => {});
+      if (cfg.cleanupMaxAgeDays > 0) {
+        store.cleanup({ maxAgeDays: cfg.cleanupMaxAgeDays }).catch(() => {});
+      }
     });
 
     // ========================================================================

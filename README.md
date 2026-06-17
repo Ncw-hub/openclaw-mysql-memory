@@ -13,6 +13,38 @@
 - **Redis 缓存**：可选的 Redis 缓存层，大幅加速重复查询响应
 - **自动清理**：定期清理过期记忆，防止数据无限增长
 
+## 📁 目录结构
+
+```
+mysql-memory/
+├── index.js                  # 插件入口：注册生命周期钩子、绑定工具与自动捕获
+├── config.js                 # 配置加载与校验：合并默认值、解析环境变量引用
+├── openclaw.plugin.json      # 插件元数据：名称、版本、OpenClaw 兼容性声明
+├── package.json              # npm 包描述与依赖声明
+├── package-lock.json         # 依赖锁定文件
+├── README.md                 # 本文档
+├── .gitignore                # Git 忽略规则
+│
+├── embed/                    # 向量嵌入层
+│   ├── .gitkeep              # 目录占位（确保 Git 跟踪空目录）
+│   └── ollama-embed.js       # Ollama Embedding 客户端：串行队列、冷却保护、超时控制
+│
+├── memory/                   # 记忆核心逻辑
+│   ├── capture.js            # 自动捕获：从对话中提取值得记忆的内容
+│   ├── filter.js             # 噪音过滤：过滤问候语、拒绝语等无意义内容
+│   ├── recall.js             # 记忆检索：向量搜索 + 关键词组合评分
+│   └── scoring.js            # 评分与排序：语义相似度、时间衰减、关键词加权
+│
+├── store/                    # 数据存储层
+│   ├── .gitkeep              # 目录占位
+│   ├── mysql-store.js        # MySQL 存储：连接池、自动建表、向量 CRUD、DDL 超时
+│   └── redis-cache.js        # Redis 缓存：检索结果缓存、TTL 管理、自动失效
+│
+└── tools/                    # OpenClaw 工具注册
+    ├── .gitkeep              # 目录占位
+    └── memory-tools.js       # 工具定义：memory_store / memory_recall / memory_forget
+```
+
 ## 🚀 安装方法
 
 ### 从 GitHub 安装

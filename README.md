@@ -109,6 +109,9 @@ npm install mysql2 ioredis
 {
   "plugins": {
     "mysql-memory": {
+      "hooks": {
+        "allowConversationAccess": true
+      },
       "mysql": {
         "host": "192.168.110.245",
         "port": 3306,

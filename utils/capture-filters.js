@@ -4,8 +4,8 @@
  * Each function returns true if the text should be filtered (NOT captured).
  */
 
-import { TOOL_USE_FILTER_RE, isToolMonologue } from "./config.js";
-import { CAPTURE_NOISE_PATTERNS, matchesCaptureNoisePattern } from "./config.js";
+import { TOOL_USE_FILTER_RE, isToolMonologue } from "../config.js";
+import { CAPTURE_NOISE_PATTERNS, matchesCaptureNoisePattern } from "../config.js";
 
 const DEFAULT_LLM_OUTPUT_MIN_LENGTH = 40;
 

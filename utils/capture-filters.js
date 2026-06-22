@@ -4,7 +4,7 @@
  * Each function returns true if the text should be filtered (NOT captured).
  */
 
-import { TOOL_USE_FILTER_RE, isToolMonologue } from "../config.js";
+import { TOOL_USE_FILTER_RE, isToolMonologue, isInjection } from "../config.js";
 import { CAPTURE_NOISE_PATTERNS, matchesCaptureNoisePattern } from "../config.js";
 
 const DEFAULT_LLM_OUTPUT_MIN_LENGTH = 40;
@@ -167,7 +167,7 @@ export function shouldCaptureAssistant(text, maxChars = 500, config = {}) {
   if (text.includes("<relevant-memories>")) return false;
   if (text.startsWith("<") && text.includes("</")) return false;
   if (text.includes("<active_memory_plugin>")) return false;
-  if (text.includes("**") && text.includes("\n-")) return false;
+  if (isInjection(text)) return false;
   
   // Filter tool-use intermediate products
   if (isToolUseIntermediate(trimmed)) return false;

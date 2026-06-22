@@ -737,103 +737,6 @@ export function matchesCaptureNoisePattern(text, config) {
   return false;
 }
 
-/** Filter for capturing assistant replies via llm_output hook.
- * Less strict than shouldCapture — no trigger words needed,
- * just content-quality checks to avoid boilerplate.
- *
- * Filters:
- * - Length: language-aware threshold (Chinese >= 20 CJK chars, English >= 40 total)
- * - Completeness: must end with sentence-ending punctuation
- * - Content: skip pure confirmations, thinking process, task status reports, meta-dialogue
- *
- * NEW: Uses matchesCaptureNoisePattern() to check against configurable noise rules.
- */
-export function shouldCaptureAssistant(text, maxChars = DEFAULT_CAPTURE_MAX_CHARS, config = {}) {
-  // Language-aware length filter: count CJK chars separately
-  const cjkCount = (text.match(/[\u4e00-\u9fff\u3400-\u4dbf]/g) || []).length;
-  // Chinese-heavy text: need >= 20 CJK chars; English-heavy: need >= 40 total chars
-  if (cjkCount >= 10) {
-    // Chinese-dominant: at least 15 CJK chars required (reduced from 20 to accept concise technical notes)
-    if (cjkCount < 15) return false;
-  } else {
-    // English-dominant: at least 40 total chars required
-    if (text.length < DEFAULT_LLM_OUTPUT_MIN_LENGTH) return false;
-  }
-  if (text.length > maxChars) return false;
-  if (text.includes("<relevant-memories>")) return false;
-  if (text.startsWith("<") && text.includes("</")) return false;
-  if (text.includes("<active_memory_plugin>")) return false;
-  if (isInjection(text)) return false;
-  // Filter tool-use intermediate products (SDK internal messages)
-  // Covers: Candidate lines, internal context wrappers, search summaries,
-  // dream evidence, untrusted metadata, ```json blocks, ANNOUNCE_SKIP, NO_REPLY
-  if (TOOL_USE_FILTER_RE.test(text.slice(0, 500))) return false;
-  if (/boot\.md|启动检查|gateway 重启|heartbeat/i.test(text)) return false;
-  // Skip pure questions
-  if (/^[^\n?？]*[?？]$/.test(text.trim())) return false;
-  // Skip markdown-only responses (headings, code fences, tables)
-  const trimmed = text.trim();
-  if (/^#{1,6}\s/.test(trimmed) && !/\n/.test(trimmed)) return false;
-  // Skip single-line lists
-  if (/^[-*•]\s/.test(trimmed) && !/\n/.test(trimmed)) return false;
-  // Skip thinking/reasoning content (models with reasoning tags)
-  if (/<(think|thinking)[^>]*>/.test(trimmed)) return false;
-  // Skip tool-call monologue (LLM thinking-out-loud) — only for short, single-sentence messages
-  if (trimmed.length < 120 && isToolMonologue(trimmed)) {
-    // Allow if it has multiple sentences (confirmation + real content)
-    const sentenceEnds = (trimmed.match(/[。！？.!?]/g) || []).length;
-    if (sentenceEnds <= 1) return false;
-  }
-
-  // ─── Completeness check — must end with sentence-ending punctuation ───
-  // Filter incomplete streaming chunks like "明白，当前..."
-  if (!/[。！？.!?]$/.test(trimmed)) return false;
-
-  // ─── NEW: Check against configurable auto-capture noise patterns ───
-  if (matchesCaptureNoisePattern(trimmed, config)) return false;
-
-  // ─── Content filter — skip pure confirmations / meta-dialogue ───
-  // Single-sentence confirmations: "明白。" / "好的。" / "收到！" / "OK." / "晚安。"
-  if (/^(明白|好的|收到|收到啦|好的呢|了解|OK|ok|好的好的|没问题|没问题了|晚安|拜拜|再见|再会|bye|Bye)[。！？.!]?\s*$/.test(trimmed)) return false;
-  // Meta-dialogue about the system/mechanism (very specific phrases, not generic words)
-  if (/^(当前去重|当前处理|机制已|不会存储|上述机制|此功能不会|该功能不会)/.test(trimmed) && trimmed.length < 150) return false;
-
-  // ─── English thinking process / self-narration ───
-  // LLM "thinking out loud" patterns with no memory value
-  if (cjkCount < 5) {
-    // Opening self-narration: Now I have, Let me, I'll, Hmm, Okay, etc.
-    if (/^(now i (have|will|need to|should)|now let|let me|let's|callers use|i'll (add|create|check|read|look|see|find|explain|show)|i (should|need to|want to|think|guess|suppose)|hmm|okay|alright|sure|let's see|let me think)/i.test(trimmed)) return false;
-    // Chain-of-thought step markers at start (short text)
-    if (/^(first,?|next,?|then,?|finally,?|so,?|basically,?|essentially,?)\s/i.test(trimmed) && trimmed.split('\n').length <= 2) return false;
-  }
-
-  // ─── Chinese task status / dispatch reports ───
-  // Operational status messages, not knowledge worth storing
-  if (/^(已派发给|正在等待|正在查询|正在执行|正在处理|正在检查|正在读取|任务完成|任务已|任务失败|已完成，|已完成[。！]|找到了|已找到|发现|检查结果|查询结果|执行结果)/.test(trimmed)) return false;
-
-  // ─── AI meta-replies about execution (new) ───
-  // Skip pure AI self-narration with no technical content
-  // Uses precise matching: only filters if the message IS a confirmation, not if it CONTAINS technical facts
-  if (/^(已记住|收到|好的我来|好的我|结果出来了|结论很清楚|扫描了一圈|这两个我都清楚|我来帮你|可以帮你|我来检查|让我来|让后端|让策划|任务已派发|已派发|派任务给|收到，|好的收到|明白，)[。！？.!]?(\s|$)/.test(trimmed) && trimmed.length < 80) return false;
-
-  // ─── Chinese simple confirmations / acknowledgements (extended) ───
-  // Broader patterns the single-sentence filter misses
-  // Extended Chinese confirmation filter — but skip if the message has
-  // multiple sentences (confirmation + actual content is acceptable)
-  if (/^(收到，|好的，|明白，|了解，|没问题，|好的呢，|行，|嗯，|嗯嗯|知道了|已了解|收到啦|好的收到)/i.test(trimmed) && trimmed.length < 120) {
-    // If it contains multiple sentence-ending marks, it has real content — keep it
-    const sentenceEnds = (trimmed.match(/[。！？.!?]/g) || []).length;
-    if (sentenceEnds <= 2) return false;
-  }
-
-  // ─── Execution status records (not knowledge) ───
-  // Skip operational logs like "已执行检查，数据已记录" / "样本不足" / "已设置复查"
-  if (/^(已执行|数据已记录|样本不足|已采集|已运行|已设置|已补完|补完了)/.test(trimmed) && trimmed.length < 200) return false;
-
-  // Otherwise accept — the vector de-dup will prevent noise
-  return true;
-}
-
 /** Fingerprint a message for dedup cursor. */
 export function fingerprint(msg) {
   if (!msg || typeof msg !== "object") return `${typeof msg}:${String(msg)}`;
@@ -858,3 +761,6 @@ export function extractLatestUserText(messages) {
   }
   return "";
 }
+
+// ─── Re-exports from utils ───────────────────────────────────
+export { recallCacheKey } from "./utils/cache-key.js";

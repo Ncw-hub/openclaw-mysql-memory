@@ -195,7 +195,7 @@ npm install mysql2 ioredis
 | `redis.db` | number | 0 | Redis 数据库编号 |
 | `embedding.model` | string | nomic-embed-text:latest | Ollama 嵌入模型名 |
 | `embedding.baseUrl` | string | http://localhost:11434 | Ollama API 基地址 |
-| `embedding.dimensions` | number | 768 | 嵌入向量维度 |
+| `embedding.dimensions` | number | 1024 | 嵌入向量维度 |
 | `autoCapture` | boolean | true | 是否自动捕获对话作为记忆 |
 | `autoRecall` | boolean | true | 是否在提示构建时自动检索相关记忆 |
 | `autoRecallTimeout` | number | 15000 | 自动检索超时（毫秒） |

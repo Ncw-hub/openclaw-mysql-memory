@@ -6,6 +6,122 @@
  * Includes Agent scope isolation support.
  */
 
+// ===================================================================
+// ===  Auto-capture noise filter patterns (for agent reply filtering)  ==
+// ===================================================================
+// These patterns filter out noise that shouldn't be stored as memories:
+// - Execution transition phrases: "我来..." / "让我..."
+// - Completion notifications: "已更新..." / "已完成..." / etc.
+// - Emoji status: "✅ 完成！" / "❌ 出错了"
+// - Simple confirmations: "好的" / "收到" / "明白"
+// - Analysis transitions: "从截图来看..." / "找到问题了..."
+
+export const CAPTURE_NOISE_PATTERNS = [
+  // Execution transition phrases (matches "我来"/"让我" followed by any non-punctuation)
+  /^我来[^，。！？]/i,
+  /^让我[^，。！？]/i,
+  /^好的，?\s*/i,  // "好的" + optional comma + optional space
+  /^这是[^，。！？]/i,
+  /^从截图[^，。！？]/i,
+  /^从您的[^，。！？]/i,
+  /^从刚才[^，。！？]/i,
+  /^你刚才[^，。！？]/i,
+  /^现在让我/i,
+  /^接下来让我/i,
+  /^然后让我/i,
+  /^我先来/i,
+  /^那我来/i,
+  /^那我就/i,
+  /^那让我/i,
+  // Completion notifications
+  /^已更新/i,
+  /^已创建/i,
+  /^已推送/i,
+  /^已添加/i,
+  /^已修改/i,
+  /^已完成/i,
+  /^已删除/i,
+  /^已清理/i,
+  /^已修复/i,
+  /^已保存/i,
+  /^已启动/i,
+  /^已停止/i,
+  /^已安装/i,
+  /^已卸载/i,
+  /^已重启/i,
+  /^已重置/i,
+  /^已同步/i,
+  /^已启用/i,
+  /^已禁用/i,
+  /^已上线/i,
+  /^已下线/i,
+  /^已发布/i,
+  /^已下架/i,
+  // Operation results
+  /^推送成功/i,
+  /^修复完成/i,
+  /^清理完成/i,
+  /^找到问题/i,
+  /^问题已/i,
+  /^解决完成/i,
+  /^执行完成/i,
+  /^处理完成/i,
+  /^操作完成/i,
+  /^准备工作已/i,
+  /^推送成功/i,
+  /^推送失败/i,
+  /^执行成功/i,
+  /^执行失败/i,
+  /^创建成功/i,
+  /^删除成功/i,
+  /^更新成功/i,
+  /^上线成功/i,
+  /^下线成功/i,
+  // Emoji status (short messages with emoji)
+  /^✅\s+/i,
+  /^❌\s+/i,
+  /^⚠️\s+/i,
+  /^🌿\s+/i,
+  /^✨\s+/i,
+  /^🎉\s+/i,
+  /^✅\s+完成/i,
+  /^❌\s+失败/i,
+  /^✅\s+已/i,
+  /^❌\s+未/i,
+  // Simple confirmations (short, single-sentence)
+  /^好的$/i,
+  /^好的，?$/i,
+  /^收到$/i,
+  /^收到，?$/i,
+  /^明白$/i,
+  /^明白，?$/i,
+  /^了解$/i,
+  /^了解，?$/i,
+  /^行$/i,
+  /^行，?$/i,
+  /^嗯$/i,
+  /^嗯，?$/i,
+  /^嗯嗯$/i,
+  /^好的好的$/i,
+  /^没问题$/i,
+  /^没问题，?$/i,
+  /^好的呢$/i,
+  /^好的呢，?$/i,
+  /^可以$/i,
+  /^可以，?$/i,
+  /^收到啦$/i,
+  /^好的收到$/i,
+  /^好的收到，?$/i,
+  /^明白了$/i,
+  /^明白了，?$/i,
+  /^好的，我来$/i,
+  /^好的，我$/i,
+  /^好的我来$/i,
+  /^好的，$/i,
+  /^收到，$/i,
+  /^明白，$/i,
+];
+
 // ─── Noise Filter Patterns (for recall-time noise detection) ───────────────
 
 // Agent denial: first-person inability claims
@@ -209,6 +325,13 @@ export function parseConfig(value) {
     : DEFAULT_MAX_CAPTURES_PER_TURN;
   const storeOnEmbedFailure = cfg.storeOnEmbedFailure !== false;
 
+  // ── Auto-capture noise filter (NEW) ──
+  const captureNoiseFilter = cfg.captureNoiseFilter || {};
+  const captureNoiseFilterEnabled = captureNoiseFilter.enabled !== false;
+  const captureNoiseFilterCustomPatterns = Array.isArray(captureNoiseFilter.customPatterns)
+    ? captureNoiseFilter.customPatterns
+    : [];
+
   // ── MySQL tuning ──
   const mysqlConnectionLimit = typeof mysql.connectionLimit === "number" ? mysql.connectionLimit : 10;
   const mysqlConnectTimeout = typeof mysql.connectTimeout === "number" ? mysql.connectTimeout : 5000;
@@ -275,6 +398,11 @@ export function parseConfig(value) {
       enabled: cfg.recencyRerank?.enabled === true,
       halfLifeDays: typeof cfg.recencyRerank?.halfLifeDays === "number" ? cfg.recencyRerank.halfLifeDays : 14,
       weight: typeof cfg.recencyRerank?.weight === "number" ? cfg.recencyRerank.weight : 0.15,
+    },
+    // Auto-capture noise filter (NEW)
+    captureNoiseFilter: {
+      enabled: captureNoiseFilterEnabled,
+      customPatterns: captureNoiseFilterCustomPatterns,
     },
   };
 }
@@ -534,6 +662,77 @@ export function isToolMonologue(text) {
   return isToolCallSelfTalk(text);
 }
 
+/** Check if text matches any auto-capture noise patterns (configurable).
+ *  @param {string} text - text to check
+ *  @param {object} config - config object with captureNoiseFilter
+ */
+export function matchesCaptureNoisePattern(text, config) {
+  const trimmed = text.trim();
+
+  // Very short pure noise - always filtered
+  if (trimmed.length <= 4) {
+    return true;
+  }
+  
+  // Emoji-only status - always filtered (e.g., "✅ 完成！", "❌ 出错了")
+  if (/^[\u2705\u274c\u26a0\ufe0f\u1f33f\u2728\u1f389]/.test(trimmed)) {
+    return true;
+  }
+
+  // Whitelist: if text contains technical content, don't filter even if it starts with noise
+  const WHITELIST_KEYWORDS = [
+    // Technical terms
+    /代码/i, /配置/i, /文件/i, /函数/i, /类/i, /方法/i,
+    /API/i, /数据库/i, /表/i, /查询/i, /字段/i,
+    /错误/i, /日志/i, /服务器/i, /进程/i, /线程/i,
+    /超时/i, /连接/i, /请求/i, /响应/i, /状态/i,
+    /版本/i, /分支/i, /提交/i, /Git/i,
+    /JavaScript/i, /TypeScript/i, /Node\.js/i, /Vue/i, /React/i,
+    /SQL/i, /MySQL/i, /Redis/i, /MongoDB/i,
+    // Chinese technical terms
+    /逻辑/i, /实现/i, /功能/i, /模块/i, /组件/i,
+    /问题/i, /解决方案/i, /修复/i, /更新/i, /调整/i,
+    /检查/i, /分析/i, /测试/i, /调试/i, /运行/i,
+  ];
+  
+  const hasSubstantiveContent = WHITELIST_KEYWORDS.some(keyword => keyword.test(trimmed));
+  
+  // Check against built-in patterns with length threshold
+  const NOISE_LENGTH_THRESHOLD = 15; // chars - lower threshold for short technical notes
+  
+  for (const pattern of CAPTURE_NOISE_PATTERNS) {
+    if (pattern.test(trimmed)) {
+      // If text is very short, it's definitely noise
+      if (trimmed.length <= NOISE_LENGTH_THRESHOLD) {
+        // Exception: if it has substantive content, allow it
+        if (hasSubstantiveContent) {
+          return false;
+        }
+        return true;
+      }
+      // If text is long, check if only the prefix matches
+      const match = trimmed.match(pattern);
+      if (match && match[0].length / trimmed.length > 0.85) {
+        return true;
+      }
+    }
+  }
+
+  // 2. Check custom patterns from config
+  if (config?.captureNoiseFilter?.enabled && Array.isArray(config.captureNoiseFilter.customPatterns)) {
+    for (const pattern of config.captureNoiseFilter.customPatterns) {
+      if (typeof pattern === 'string') {
+        const regex = new RegExp(pattern, 'i');
+        if (regex.test(trimmed)) return true;
+      } else if (pattern instanceof RegExp) {
+        if (pattern.test(trimmed)) return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 /** Filter for capturing assistant replies via llm_output hook.
  * Less strict than shouldCapture — no trigger words needed,
  * just content-quality checks to avoid boilerplate.
@@ -542,8 +741,10 @@ export function isToolMonologue(text) {
  * - Length: language-aware threshold (Chinese >= 20 CJK chars, English >= 40 total)
  * - Completeness: must end with sentence-ending punctuation
  * - Content: skip pure confirmations, thinking process, task status reports, meta-dialogue
+ *
+ * NEW: Uses matchesCaptureNoisePattern() to check against configurable noise rules.
  */
-export function shouldCaptureAssistant(text, maxChars = DEFAULT_CAPTURE_MAX_CHARS) {
+export function shouldCaptureAssistant(text, maxChars = DEFAULT_CAPTURE_MAX_CHARS, config = {}) {
   // Language-aware length filter: count CJK chars separately
   const cjkCount = (text.match(/[\u4e00-\u9fff\u3400-\u4dbf]/g) || []).length;
   // Chinese-heavy text: need >= 20 CJK chars; English-heavy: need >= 40 total chars
@@ -583,6 +784,9 @@ export function shouldCaptureAssistant(text, maxChars = DEFAULT_CAPTURE_MAX_CHAR
   // ─── Completeness check — must end with sentence-ending punctuation ───
   // Filter incomplete streaming chunks like "明白，当前..."
   if (!/[。！？.!?]$/.test(trimmed)) return false;
+
+  // ─── NEW: Check against configurable auto-capture noise patterns ───
+  if (matchesCaptureNoisePattern(trimmed, config)) return false;
 
   // ─── Content filter — skip pure confirmations / meta-dialogue ───
   // Single-sentence confirmations: "明白。" / "好的。" / "收到！" / "OK." / "晚安。"

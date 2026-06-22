@@ -12,11 +12,12 @@
  * All timeouts and limits are config-driven with sensible defaults.
  */
 
-import { parseConfig, MEMORY_CATEGORIES, extractLatestUserText, resolveAgentScopePlan, shouldCaptureAssistant, shouldCapture, asText, isNoiseMemory, calculateRecencyBoost } from "./config.js";
+import { parseConfig, MEMORY_CATEGORIES, extractLatestUserText, resolveAgentScopePlan, shouldCapture, asText, isNoiseMemory, calculateRecencyBoost, recallCacheKey } from "./config.js";
 import { MySqlStore } from "./store/mysql-store.js";
 import { RedisCache } from "./store/redis-cache.js";
 import { OllamaEmbed } from "./embed/ollama-embed.js";
 import { registerMemoryTools } from "./tools/memory-tools.js";
+import { shouldCaptureAssistant } from "./utils/capture-filters.js";
 
 // ============================================================================
 // Plugin entry
@@ -464,18 +465,6 @@ import {
   fingerprint,
   escapeHtml,
 } from "./config.js";
-
-function recallCacheKey(query, sessionKey, limit, config) {
-  const h = simpleHash(query);
-  const nf = config.noiseFilter || {};
-  const rr = config.recencyRerank || {};
-  const configStr = [
-    'nf', nf.enabled ? '1' : '0', nf.expandFactor || '2.0', nf.maxExpandedCandidates || '100',
-    'rr', rr.enabled ? '1' : '0', rr.halfLifeDays || '14', rr.weight || '0.15',
-  ].join('|');
-  const configVersion = simpleHash(configStr);
-  return `mysql-memory:recall:v2:${h}:${sessionKey || "all"}:${limit}:${configVersion}`;
-}
 
 function runWithTimeout({ timeoutMs, task }) {
   let timeout;

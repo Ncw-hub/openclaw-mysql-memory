@@ -2,6 +2,14 @@
 
 基于 MySQL 9.7+ VECTOR 类型和 Redis 缓存的长期记忆插件。为 OpenClaw 代理系统提供可扩展、智能的记忆存储与检索能力。
 
+# 声明
+
+- **谁来做**：本插件全程由 OpenClaw 智能体实现，人工仅提供框架思路
+- **为什么做**：使用 OpenClaw 以来，发现原生记忆系统体验不佳（包括梦境功能浪费 token），且原生QMD方案在 Windows 上安装复杂
+- **为什么选择 MySQL**：使用局域网 MySQL 9.7+ 和局域网 Ollama，释放本机算力；局域网服务器只负责 MySQL + Embedding，配置要求不高
+- **后续更新**：全程由 OpenClaw 智能体完成
+- **使用大模型**：qwen3.7-plus（项目经理主代理、策划子代理）+ qwen3-coder-next（后端子代理）
+
 ## 📦 核心功能
 
 - **向量搜索**：使用 MySQL 9.7+ 原生 VECTOR 类型存储文本向量，支持语义相似度检索
@@ -18,30 +26,25 @@
 ```
 mysql-memory/
 ├── index.js                  # 插件入口：注册生命周期钩子、绑定工具与自动捕获
-├── config.js                 # 配置加载与校验：合并默认值、解析环境变量引用
+├── config.js                 # 配置加载与校验：合并默认值、解析环境变量引用、噪声过滤规则
 ├── openclaw.plugin.json      # 插件元数据：名称、版本、OpenClaw 兼容性声明
 ├── package.json              # npm 包描述与依赖声明
 ├── package-lock.json         # 依赖锁定文件
 ├── README.md                 # 本文档
 ├── .gitignore                # Git 忽略规则
 │
+├── utils/                    # 工具函数
+│   ├── cache-key.js          # 缓存键生成：集中管理 recall 缓存键逻辑
+│   └── capture-filters.js    # 捕获过滤：噪声模式匹配、白名单机制、可配置规则
+│
 ├── embed/                    # 向量嵌入层
-│   ├── .gitkeep              # 目录占位（确保 Git 跟踪空目录）
 │   └── ollama-embed.js       # Ollama Embedding 客户端：串行队列、冷却保护、超时控制
 │
-├── memory/                   # 记忆核心逻辑
-│   ├── capture.js            # 自动捕获：从对话中提取值得记忆的内容
-│   ├── filter.js             # 噪音过滤：过滤问候语、拒绝语等无意义内容
-│   ├── recall.js             # 记忆检索：向量搜索 + 关键词组合评分
-│   └── scoring.js            # 评分与排序：语义相似度、时间衰减、关键词加权
-│
 ├── store/                    # 数据存储层
-│   ├── .gitkeep              # 目录占位
-│   ├── mysql-store.js        # MySQL 存储：连接池、自动建表、向量 CRUD、DDL 超时
-│   └── redis-cache.js        # Redis 缓存：检索结果缓存、TTL 管理、自动失效
+│   ├── mysql-store.js        # MySQL 存储：连接池、自动建表、向量 CRUD、健康检查
+│   └── redis-cache.js        # Redis 缓存：检索结果缓存、TTL 管理、自动重连
 │
 └── tools/                    # OpenClaw 工具注册
-    ├── .gitkeep              # 目录占位
     └── memory-tools.js       # 工具定义：memory_store / memory_recall / memory_forget
 ```
 

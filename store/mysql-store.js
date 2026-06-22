@@ -17,6 +17,24 @@ import { vectorToString, parseVectorString, cosineSimilarity, isNoiseMemory, cal
 const TABLE_NAME = "memories";
 const DEFAULT_VECTOR_DIM = 768;
 
+/**
+ * Validate table name to prevent SQL injection / invalid identifiers.
+ * Accepts only alphanumeric characters and underscores.
+ */
+function validateTableName(name) {
+  if (!/^[a-zA-Z0-9_]+$/.test(name)) {
+    throw new Error(`Invalid table name: ${name}`);
+  }
+  return name;
+}
+
+// Validate at module load time (early failure if misconfigured)
+try {
+  validateTableName(TABLE_NAME);
+} catch (err) {
+  throw new Error(`mysql-memory: Table name validation failed - ${err.message}`);
+}
+
 // Defaults for when config.mysql.* is missing
 const DEFAULT_CONNECTION_LIMIT = 10;
 const DEFAULT_CONNECT_TIMEOUT = 5_000;
@@ -154,6 +172,27 @@ export class MySqlStore {
   }
 
   // ─── Search (app-layer cosine similarity) ──────────────────────────────────
+  /**
+   * Search with cosine similarity computed in JavaScript.
+   * Performance notes:
+   * - Fetches up to candidateLimit records (default 50) from MySQL
+   * - Each record has a 768-dimension vector (configurable)
+   * - JS computes cosine similarity for all candidates
+   * - Sorting is done in JS (O(n log n) for top N)
+   * - For larger datasets, consider MySQL 9.7 VECTOR_DISTANCE() function
+   *   (if available) or breaking into smaller batches
+   *
+   * @param {number[]} queryVector
+   * @param {object} opts
+   * @param {string} [opts.sessionKey]  — filter by session
+   * @param {string} [opts.category]    — filter by category
+   * @param {string} [opts.agentId]     — filter by agent
+   * @param {string|string[]} [opts.scopeKey] — filter by scope(s)
+   * @param {number} [opts.limit]       — max results (default 3)
+   * @param {number} [opts.minScore]    — min cosine similarity (default 0.3)
+   * @param {number} [opts.candidateLimit] — max candidates to fetch (default 50)
+   * @returns {Array<{entry: object, score: number}>}
+   */
 
   /**
    * @param {number[]} queryVector
@@ -219,7 +258,10 @@ export class MySqlStore {
     const results = [];
     for (const row of rows) {
       const vector = parseVectorString(row.vec_str);
-      if (vector.length !== queryVector.length) continue;
+      if (vector.length !== queryVector.length) {
+        this.logger.warn?.(`mysql-memory: vector dim mismatch ${vector.length} vs ${queryVector.length}, skipping`);
+        continue;
+      }
 
       const score = cosineSimilarity(queryVector, vector);
       if (score >= minScore) {
@@ -332,10 +374,14 @@ export class MySqlStore {
   }
 
   // ─── SearchRaw (no JS filtering — returns all candidates for reranking) ───
-
   /**
    * Fetch candidates with cosine scores, NO minScore filtering or limiting.
    * Used by recall.js for composite reranking.
+   * Performance notes: same as search() but returns all candidates without sorting.
+   * @param {number[]} queryVector
+   * @param {object} opts
+   * @param {number} [opts.candidateLimit] — max raw candidates from MySQL (default 50)
+   * @returns {Array<{entry: object, cosine: number}>}
    */
   async searchRaw(queryVector, opts = {}) {
     const pool = await this.ensureInitialized();
@@ -384,7 +430,10 @@ export class MySqlStore {
     const results = [];
     for (const row of rows) {
       const vector = parseVectorString(row.vec_str);
-      if (vector.length !== queryVector.length) continue;
+      if (vector.length !== queryVector.length) {
+        this.logger.warn?.(`mysql-memory: vector dim mismatch ${vector.length} vs ${queryVector.length}, skipping`);
+        continue;
+      }
       const cosine = cosineSimilarity(queryVector, vector);
       results.push({
         entry: {
@@ -519,6 +568,28 @@ export class MySqlStore {
       source: row.source,
       created_at: parseInt(row.created_at),
     }));
+  }
+
+  // ─── Health check ────────────────────────────────────────────────────────
+  /**
+   * Check if the database connection is healthy.
+   * @returns {Promise<{status: 'healthy'|'unhealthy', error?: string}>}
+   */
+  async healthCheck() {
+    if (!this.pool) {
+      try {
+        await this.ensureInitialized();
+      } catch (err) {
+        return { status: 'unhealthy', error: err.message };
+      }
+    }
+    try {
+      const timeout = 2000;
+      await this.pool.query("SELECT 1", [], { timeout });
+      return { status: 'healthy' };
+    } catch (err) {
+      return { status: 'unhealthy', error: err.message };
+    }
   }
 
   // ─── Stats ─────────────────────────────────────────────────────────────────

@@ -231,6 +231,16 @@ export const DEFAULT_MAX_CAPTURES_PER_TURN = 5;
 export const DEFAULT_STORE_ON_EMBED_FAILURE = true;
 export const DEFAULT_LLM_OUTPUT_MIN_LENGTH = 40; // filter streaming chunks/fragments
 
+/** Clamp a number to a range. */
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, typeof value === "number" ? value : min));
+}
+
+/** Clamp a number to a range, or return fallback if not a number. */
+function clampOrFallback(value, min, max, fallback) {
+  return typeof value === "number" ? clamp(value, min, max) : fallback;
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function resolveEnvVars(value) {
@@ -306,23 +316,17 @@ export function parseConfig(value) {
 
   // ── Cache ──
   const cacheCfg = cfg.cache || {};
-  const recallCacheTTL = typeof cacheCfg.recallCacheTTL === "number" ? cacheCfg.recallCacheTTL : DEFAULT_RECALL_CACHE_TTL;
-  const maxCacheEntries = typeof cacheCfg.maxCacheEntries === "number" ? cacheCfg.maxCacheEntries : DEFAULT_MAX_CACHE_ENTRIES;
+  const recallCacheTTL = clampOrFallback(cacheCfg.recallCacheTTL, 60, 86400, DEFAULT_RECALL_CACHE_TTL);
+  const maxCacheEntries = clampOrFallback(cacheCfg.maxCacheEntries, 10, 10000, DEFAULT_MAX_CACHE_ENTRIES);
 
   // ── Behaviour ──
-  const captureMaxChars = typeof cfg.captureMaxChars === "number"
-    ? Math.max(100, Math.min(10_000, Math.floor(cfg.captureMaxChars)))
-    : DEFAULT_CAPTURE_MAX_CHARS;
-  const recallMaxChars = typeof cfg.recallMaxChars === "number"
-    ? Math.max(100, Math.min(10_000, Math.floor(cfg.recallMaxChars)))
-    : DEFAULT_RECALL_MAX_CHARS;
-  const similarityThreshold = typeof cfg.similarityThreshold === "number" ? cfg.similarityThreshold : DEFAULT_SIMILARITY_THRESHOLD;
-  const candidateLimit = typeof cfg.candidateLimit === "number" ? cfg.candidateLimit : DEFAULT_CANDIDATE_LIMIT;
-  const recallLimit = typeof cfg.recallLimit === "number" ? cfg.recallLimit : DEFAULT_RECALL_LIMIT;
-  const recallMinScore = typeof cfg.recallMinScore === "number" ? cfg.recallMinScore : DEFAULT_RECALL_MIN_SCORE;
-  const maxCapturesPerTurn = typeof cfg.maxCapturesPerTurn === "number"
-    ? Math.max(1, Math.min(20, Math.floor(cfg.maxCapturesPerTurn)))
-    : DEFAULT_MAX_CAPTURES_PER_TURN;
+  const captureMaxChars = clampOrFallback(cfg.captureMaxChars, 100, 10_000, DEFAULT_CAPTURE_MAX_CHARS);
+  const recallMaxChars = clampOrFallback(cfg.recallMaxChars, 100, 10_000, DEFAULT_RECALL_MAX_CHARS);
+  const similarityThreshold = clampOrFallback(cfg.similarityThreshold, 0, 1, DEFAULT_SIMILARITY_THRESHOLD);
+  const candidateLimit = clampOrFallback(cfg.candidateLimit, 10, 200, DEFAULT_CANDIDATE_LIMIT);
+  const recallLimit = clampOrFallback(cfg.recallLimit, 1, 50, DEFAULT_RECALL_LIMIT);
+  const recallMinScore = clampOrFallback(cfg.recallMinScore, 0, 1, DEFAULT_RECALL_MIN_SCORE);
+  const maxCapturesPerTurn = clampOrFallback(cfg.maxCapturesPerTurn, 1, 20, DEFAULT_MAX_CAPTURES_PER_TURN);
   const storeOnEmbedFailure = cfg.storeOnEmbedFailure !== false;
 
   // ── Auto-capture noise filter (NEW) ──

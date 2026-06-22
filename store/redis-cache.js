@@ -7,7 +7,7 @@
  * All timeouts/retry counts are config-driven with sensible defaults.
  */
 
-import { createClient } from "ioredis";
+import Redis from "ioredis";
 
 const DEFAULT_CONNECT_TIMEOUT = 2_000;
 const DEFAULT_COMMAND_TIMEOUT = 3_000;
@@ -20,19 +20,27 @@ export class RedisCache {
     this.initPromise = null;
     this.client = null;
     this.failed = false;
+    this.lastFailTime = 0;  // For retry cooldown
   }
 
   // ─── Lazy connect ──────────────────────────────────────────────────────────
 
   async ensureConnected() {
     if (this.client) return this.client;
-    if (this.failed) return null;
+    if (this.failed) {
+      // Allow retry after 5 minute cooldown
+      const retryCooldown = 300_000; // 5 minutes
+      if (Date.now() - this.lastFailTime < retryCooldown) {
+        return null;
+      }
+    }
     if (this.initPromise) return this.initPromise;
 
     this.initPromise = this._doConnect().catch((err) => {
       this.initPromise = null;
       this.failed = true;
-      this.logger.warn?.(`mysql-memory: Redis connection failed, cache disabled: ${err.message}`);
+      this.lastFailTime = Date.now();
+      this.logger.warn?.(`mysql-memory: Redis connection failed, cache disabled (cooldown until ${new Date(Date.now() + 300_000).toLocaleTimeString()}): ${err.message}`);
       return null;
     });
     return this.initPromise;
@@ -49,7 +57,7 @@ export class RedisCache {
     const maxRetries = typeof this.config.maxRetries === "number"
       ? this.config.maxRetries : DEFAULT_MAX_RETRIES;
 
-    this.client = createClient({
+    this.client = new Redis({
       host: this.config.host,
       port: this.config.port,
       password: this.config.password || undefined,

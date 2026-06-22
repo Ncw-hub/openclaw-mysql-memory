@@ -12,6 +12,7 @@ import {
   simpleHash,
   detectCategory,
   resolveAgentScopePlan,
+  recallCacheKey,
 } from "../config.js";
 
 /**
@@ -27,20 +28,7 @@ export function registerMemoryTools(api, deps) {
     return resolveAgentScopePlan(cfg, toolCtx || {});
   }
 
-  // ─── Cache key helper (v2 — includes config version) ─────────────────────
-
-  function recallCacheKey(query, sessionKey, limit, config) {
-    const h = simpleHash(query);
-    // Build config version string from key recall-time settings
-    const nf = config.noiseFilter || {};
-    const rr = config.recencyRerank || {};
-    const configStr = [
-      'nf', nf.enabled ? '1' : '0', nf.expandFactor || '2.0', nf.maxExpandedCandidates || '100',
-      'rr', rr.enabled ? '1' : '0', rr.halfLifeDays || '14', rr.weight || '0.15',
-    ].join('|');
-    const configVersion = simpleHash(configStr);
-    return `mysql-memory:recall:v2:${h}:${sessionKey || "all"}:${limit}:${configVersion}`;
-  }
+  // ─── Cached recall limit ─────────────────────────────────────────────────
 
   // ─── memory_recall ─────────────────────────────────────────────────────────
 

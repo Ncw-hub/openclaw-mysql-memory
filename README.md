@@ -6,9 +6,10 @@
 
 - **谁来做**：本插件全程由 OpenClaw 智能体实现，人工仅提供框架思路
 - **为什么做**：使用 OpenClaw 以来，发现原生记忆系统体验不佳（包括梦境功能浪费 token），且原生QMD方案在 Windows 上安装复杂
-- **为什么选择 MySQL**：使用局域网 MySQL 9.7+ 和局域网 Ollama，释放本机算力；局域网服务器只负责 MySQL + Embedding，配置要求不高
+- **为什么选择 MySQL**：使用局域网 MySQL 9.7+ 和局域网 Ollama，释放本机算力；局域网服务器只负责 MySQL + Embedding，配置要求不高 使用linux系统体验更丝滑
 - **后续更新**：全程由 OpenClaw 智能体完成
 - **使用大模型**：qwen3.7-plus（项目经理主代理、策划子代理）+ qwen3-coder-next（后端子代理）
+- **已知限制**：需要 MySQL 9.7+（VECTOR 类型支持）、Ollama Embedding 服务、可选 Redis
 
 ## 📦 核心功能
 
@@ -429,6 +430,45 @@ FROM memories
 GROUP BY agent_id, scope_key 
 ORDER BY agent_id, scope_key;
 ```
+
+## 🔮 未来规划
+
+### 原生向量索引支持
+
+**当前状态**：MySQL 9.7.0/9.7.1 仅支持 VECTOR 数据类型，**不支持原生向量索引（VECTOR INDEX）**。
+
+**当前方案**：
+- 从 MySQL 获取候选记录（最多 50 条）
+- 在 JavaScript 中计算余弦相似度
+- 在应用层排序和过滤
+
+**期望改进**：
+当 MySQL 未来版本（可能是 9.8+ 或 10.x）支持本地原生向量索引（HNSW）后，插件将升级为：
+```sql
+-- 未来支持的语法（当前不可用）
+CREATE VECTOR INDEX idx_vector ON memories(vector)
+  ALGORITHM=HNSW
+  DISTANCE=cosine;
+
+-- 使用原生向量距离函数
+SELECT id, text, VECTOR_DISTANCE(vector, STRING_TO_VECTOR(?), 'cosine') AS score
+FROM memories
+ORDER BY score ASC
+LIMIT 10;
+```
+
+**性能提升预期**：
+- 当前（JS 计算）：数据量 <10000 条时性能良好
+- 未来（原生索引）：支持百万级向量数据，查询延迟 <10ms
+
+**升级计划**：
+1. 监控 MySQL 版本更新，等待原生向量索引支持
+2. 一旦 MySQL 本地版本支持 VECTOR INDEX，立即更新插件
+3. 保持向后兼容，同时支持 JS 计算和原生索引两种模式
+
+**参考**：
+- [MySQL HeatWave 向量索引](https://dev.mysql.com/doc/heatwave/en/mys-hw-genai-vector-index-creation.html)（Oracle 云已支持）
+- [MySQL 9.7 Release Notes](https://dev.mysql.com/doc/relnotes/mysql/9.7/en/)
 
 ## 📚 相关资源
 

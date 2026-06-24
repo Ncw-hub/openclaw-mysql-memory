@@ -67,13 +67,25 @@ cd ~/.openclaw/extensions
 git clone https://github.com/Ncw-hub/openclaw-mysql-memory.git mysql-memory
 ```
 
-### 确保依赖已安装
+### 安装依赖
 
-插件需要以下依赖（通常已包含在 OpenClaw 环境中）：
+进入插件目录，安装所有依赖：
 
 ```bash
-npm install mysql2 ioredis
+cd mysql-memory
+npm install
 ```
+
+这将自动安装 `package.json` 中声明的所有依赖：
+- `mysql2` - MySQL 连接驱动
+- `ioredis` - Redis 客户端
+- `typebox` - 配置校验
+
+**前置要求**：
+- Node.js 18+
+- MySQL 9.7+（支持 VECTOR 类型）
+- Ollama（提供 Embedding 服务）
+- Redis（可选，用于缓存加速）
 
 ## ⚙️ 配置说明
 

@@ -121,16 +121,16 @@ npm install
 
 在 `openclaw.json` 中配置插件：
 
-```json
+```jsonc
 {
 "plugins": {
-  "entries":{
-    "mysql-memory": {
-        "enabled": true,
-        "hooks": {
+  "entries":{                        // 插件注册入口，所有插件都放在这里
+    "mysql-memory": {                // 插件 ID，必须与插件声明的 id 一致
+        "enabled": true,             // 启用开关
+        "hooks": {                   // 钩子配置：允许插件访问会话数据
           "allowConversationAccess": true
         },
-        "config": {
+        "config": {                  // 插件核心配置：MySQL/Redis/Embedding 等参数都在这里
           "isolateAgents": true,
           "recallLimit": 3,
           "similarityThreshold": 0.85,

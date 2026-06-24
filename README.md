@@ -123,67 +123,61 @@ npm install
 
 ```json
 {
-  "plugins": {
+"plugins": {
+  "entries":{
     "mysql-memory": {
-      "hooks": {
-        "allowConversationAccess": true
-      },
-      "mysql": {
-        "host": "192.168.110.245",
-        "port": 3306,
-        "database": "openclaw_memory",
-        "user": "openclaw",
-        "password": "${MYSQL_PASSWORD}",
-        "connectionLimit": 10,
-        "connectTimeout": 5000,
-        "queryTimeout": 10000,
-        "ddlTimeout": 30000
-      },
-      "redis": {
-        "host": "192.168.110.245",
-        "port": 6377,
-        "password": "",
-        "db": 0,
         "enabled": true,
-        "connectTimeout": 2000,
-        "commandTimeout": 3000,
-        "maxRetries": 3
-      },
-      "embedding": {
-        "model": "nomic-embed-text:latest",
-        "baseUrl": "http://192.168.110.245:11434",
-        "dimensions": 768,
-        "timeoutMs": 10000,
-        "maxChars": 2000
-      },
-      "autoCapture": true,
-      "autoRecall": true,
-      "autoRecallTimeout": 15000,
-      "captureMaxChars": 500,
-      "recallMaxChars": 1000,
-      "similarityThreshold": 0.95,
-      "candidateLimit": 50,
-      "recallLimit": 3,
-      "recallMinScore": 0.3,
-      "maxCapturesPerTurn": 5,
-      "storeOnEmbedFailure": true,
-      "isolateAgents": false,
-      "scopes": {},
-      "cache": {
-        "recallCacheTTL": 300,
-        "maxCacheEntries": 1000
-      },
-      "noiseFilter": {
-        "enabled": false,
-        "expandFactor": 2.0,
-        "maxExpandedCandidates": 100
-      },
-      "recencyRerank": {
-        "enabled": false,
-        "halfLifeDays": 14,
-        "weight": 0.15
+        "hooks": {
+          "allowConversationAccess": true
+        },
+        "config": {
+          "isolateAgents": true,
+          "recallLimit": 3,
+          "similarityThreshold": 0.85,
+          "embedding": {
+            "model": "snowflake-arctic-embed2:568m",
+            "dimensions": 1024,
+            "baseUrl": "http://127.0.0.1:11434"
+          },
+          "candidateLimit": 50,
+          "cache": {
+            "maxCacheEntries": 1000,
+            "recallCacheTTL": 300
+          },
+          "mysql": {
+            "user": "root",
+            "password": "${MYSQL_PASSWORD}",
+            "database": "openclaw_memory",
+            "port": 3306,
+            "host": "127.0.0.1"
+          },
+          "captureMaxChars": 5000,
+          "maxCapturesPerTurn": 5,
+          "storeOnEmbedFailure": true,
+          "redis": {
+            "enabled": true,
+            "password": "${REDIS_PASSWORD}",
+            "db": 0,
+            "port": 6379,
+            "host": "127.0.0.1"
+          },
+          "recallMaxChars": 1000,
+          "recallMinScore": 0.4,
+          "autoRecall": true,
+          "autoCapture": true,
+          "noiseFilter": {
+            "enabled": true,
+            "expandFactor": 2,
+            "maxExpandedCandidates": 100
+          },
+          "recencyRerank": {
+            "enabled": true,
+            "halfLifeDays": 14,
+            "weight": 0.15
+          }
+        }
       }
-    }
+	}
   }
 }
 ```

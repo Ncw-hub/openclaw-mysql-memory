@@ -131,49 +131,59 @@ npm install
           "allowConversationAccess": true
         },
         "config": {                  // 插件核心配置：MySQL/Redis/Embedding 等参数都在这里
-          "isolateAgents": true,
-          "recallLimit": 3,
-          "similarityThreshold": 0.85,
+          // ── Agent 隔离 ──
+          "isolateAgents": true,      // 是否启用 Agent 隔离（每个 Agent 独立记忆空间）
+          // ── 检索参数 ──
+          "recallLimit": 3,           // 每次检索返回的结果数量
+          "similarityThreshold": 0.85,// 去重所需的最小语义相似度（0-1，越高越严格）
+          "candidateLimit": 50,       // 检索候选数量（从 MySQL 取多少条候选再排序）
+          "recallMaxChars": 1000,     // 检索查询文本最大长度（截断过长查询）
+          "recallMinScore": 0.4,      // 检索结果最小分数阈值（低于此分数的结果丢弃）
+          // ── Embedding 向量嵌入 ──
           "embedding": {
-            "model": "snowflake-arctic-embed2:568m",
-            "dimensions": 1024,
-            "baseUrl": "http://127.0.0.1:11434"
+            "model": "snowflake-arctic-embed2:568m", // Ollama 嵌入模型名称
+            "dimensions": 1024,       // 向量维度（必须与模型实际输出维度一致）
+            "baseUrl": "http://127.0.0.1:11434"     // Ollama API 地址
           },
-          "candidateLimit": 50,
+          // ── Redis 缓存 ──
           "cache": {
-            "maxCacheEntries": 1000,
-            "recallCacheTTL": 300
+            "maxCacheEntries": 1000,  // 缓存最大条目数
+            "recallCacheTTL": 300     // 缓存过期时间（秒）
           },
+          // ── MySQL 连接 ──
           "mysql": {
-            "user": "root",
-            "password": "${MYSQL_PASSWORD}",
-            "database": "openclaw_memory",
-            "port": 3306,
-            "host": "127.0.0.1"
+            "user": "root",           // 数据库用户名
+            "password": "${MYSQL_PASSWORD}", // 密码（支持 ${ENV_VAR} 环境变量引用）
+            "database": "openclaw_memory",   // 数据库名
+            "port": 3306,             // 端口
+            "host": "127.0.0.1"       // 服务器地址
           },
-          "captureMaxChars": 5000,
-          "maxCapturesPerTurn": 5,
-          "storeOnEmbedFailure": true,
+          // ── 自动捕获参数 ──
+          "captureMaxChars": 5000,    // 单次捕获文本最大长度
+          "maxCapturesPerTurn": 5,    // 每轮会话最大捕获条数
+          "storeOnEmbedFailure": true,// Embedding 失败时是否降级为纯文本存储
+          // ── Redis 连接 ──
           "redis": {
-            "enabled": true,
-            "password": "${REDIS_PASSWORD}",
-            "db": 0,
-            "port": 6379,
-            "host": "127.0.0.1"
+            "enabled": true,          // 是否启用 Redis 缓存加速
+            "password": "${REDIS_PASSWORD}", // Redis 密码
+            "db": 0,                  // Redis 数据库编号
+            "port": 6379,             // Redis 端口
+            "host": "127.0.0.1"       // Redis 服务器地址
           },
-          "recallMaxChars": 1000,
-          "recallMinScore": 0.4,
-          "autoRecall": true,
-          "autoCapture": true,
+          // ── 自动记忆开关 ──
+          "autoRecall": true,         // 是否自动检索相关记忆注入上下文
+          "autoCapture": true,        // 是否自动捕获对话内容作为记忆
+          // ── 噪音过滤（检索时）──
           "noiseFilter": {
-            "enabled": true,
-            "expandFactor": 2,
-            "maxExpandedCandidates": 100
+            "enabled": true,          // 是否启用噪音过滤（过滤问候语等无价值记忆）
+            "expandFactor": 2,        // 候选扩展倍数（用于噪音识别的候选范围）
+            "maxExpandedCandidates": 100 // 扩展后最大候选数
           },
+          // ── 延迟折叠（时间衰减重排序）──
           "recencyRerank": {
-            "enabled": true,
-            "halfLifeDays": 14,
-            "weight": 0.15
+            "enabled": true,          // 是否启用时间衰减重新排序
+            "halfLifeDays": 14,       // 衰减半衰期（天）：14天前记忆权重减半
+            "weight": 0.15            // 衰减权重（越大越偏好新记忆）
           }
         }
       }

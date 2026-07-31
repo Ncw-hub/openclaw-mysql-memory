@@ -80,10 +80,11 @@ export async function autoCapture(event, ctx, deps, opts = {}) {
       }
 
       // Check for duplicates in store (config-driven threshold)
+      // Use at least 200 candidates to increase dedup coverage
       const existing = await store.search(vector, {
         limit: 1,
         minScore: similarityThreshold,
-        candidateLimit,
+        candidateLimit: Math.max(candidateLimit, 200),
       });
       if (existing.length > 0) {
         logger.info?.(`mysql-memory: capture skipped, duplicate found: "${text.slice(0, 50)}..."`);

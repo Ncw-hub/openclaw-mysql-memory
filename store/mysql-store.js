@@ -122,8 +122,16 @@ export class MySqlStore {
     try {
       await this.pool.query(`ALTER TABLE ${TABLE_NAME} MODIFY COLUMN vector VECTOR(${this.vectorDim}) DEFAULT NULL`, [], { timeout: ddlTimeout });
     } catch { /* column already nullable / dim mismatch — manual migration needed */ }
+    // Add text_hash column for exact dedup (STORED GENERATED, SHA-256)
+    try {
+      await this.pool.query(`ALTER TABLE ${TABLE_NAME} ADD COLUMN text_hash CHAR(64) GENERATED ALWAYS AS (SHA2(text, 256)) STORED`, [], { timeout: ddlTimeout });
+    } catch { /* column already exists */ }
+    // UNIQUE index on text_hash for database-level dedup guard
+    try {
+      await this.pool.query(`ALTER TABLE ${TABLE_NAME} ADD UNIQUE INDEX idx_text_hash_unique (text_hash)`, [], { timeout: ddlTimeout });
+    } catch { /* index already exists or duplicate data prevents creation */ }
 
-    this.logger.info?.(`mysql-memory: table '${TABLE_NAME}' ready (VECTOR ${this.vectorDim}d, agent isolation ready)`);
+    this.logger.info?.(`mysql-memory: table '${TABLE_NAME}' ready (VECTOR ${this.vectorDim}d, agent isolation ready, text_hash dedup active)`);
     return this.pool;
   }
 
@@ -150,6 +158,32 @@ export class MySqlStore {
     };
 
     const queryTimeout = num(this.config, "queryTimeout", DEFAULT_QUERY_TIMEOUT);
+
+    // 精确去重：text_hash 是 SHA-256 生成列，与数据库计算方式一致
+    try {
+      const [dupes] = await pool.query(
+        `SELECT id, text, category, session_key, agent_id, scope_key, source, created_at FROM ${TABLE_NAME} WHERE text_hash = SHA2(?, 256) LIMIT 1`,
+        [fullEntry.text], { timeout: queryTimeout }
+      );
+      if (dupes.length > 0) {
+        this.logger.info?.(`mysql-memory: store skipped, duplicate text_hash: "${fullEntry.text.slice(0, 50)}..."`);
+        return {
+          id: dupes[0].id,
+          text: dupes[0].text,
+          category: dupes[0].category,
+          session_key: dupes[0].session_key,
+          agent_id: dupes[0].agent_id,
+          scope_key: dupes[0].scope_key,
+          source: dupes[0].source,
+          created_at: parseInt(dupes[0].created_at),
+          deduplicated: true,
+        };
+      }
+    } catch (err) {
+      // text_hash column may not exist yet (first run before backfill); fall through to INSERT
+      this.logger.warn?.(`mysql-memory: text_hash dedup check failed (column may not exist yet): ${err.message}`);
+    }
+
     if (fullEntry.vector === null) {
       // Text-only storage without embedding
       await pool.query(

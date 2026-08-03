@@ -218,7 +218,7 @@ export function registerMemoryTools(api, deps) {
       }),
       async execute(_toolCallId, params) {
         try {
-          const { query, memoryId } = params;
+          const { query, memoryId, scope } = params;
 
           if (memoryId) {
             const deleted = await store.forget(memoryId);

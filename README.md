@@ -8,7 +8,7 @@
 - **为什么做**：使用 OpenClaw 以来，发现原生记忆系统体验不佳（包括梦境功能浪费 token），且原生QMD方案在 Windows 上安装复杂
 - **为什么选择 MySQL**：使用局域网 MySQL 9.7+ 和局域网 Ollama，释放本机算力；局域网服务器只负责 MySQL + Embedding，配置要求不高 使用linux系统体验更丝滑
 - **后续更新**：全程由 OpenClaw 智能体完成
-- **使用大模型**：qwen3.7-plus（项目经理主代理、策划子代理）+ qwen3-coder-next（后端子代理）
+- **使用大模型**：qwen3.8-max-preview（项目经理主代理、策划子代理）+ qwen3-coder-next[老] 和 deepseek-v4-pro[新]（后端子代理）
 - **已知限制**：需要 MySQL 9.7+（VECTOR 类型支持）、Ollama Embedding 服务、可选 Redis
 
 ## 📦 核心功能

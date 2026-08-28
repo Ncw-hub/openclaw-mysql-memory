@@ -1,6 +1,6 @@
 {
   "name": "mysql-memory",
-  "version": "2026.7.1",
+  "version": "2026.7.1-4",
   "description": "MySQL-backed long-term memory with Redis cache and Ollama embeddings",
   "license": "MIT",
   "type": "module",

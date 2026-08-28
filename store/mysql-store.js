@@ -348,11 +348,13 @@ export class MySqlStore {
     const noiseFilter = opts.noiseFilter || { enabled: false };
     const recencyRerank = opts.recencyRerank || { enabled: false };
 
-    // Determine expanded candidate count
+    // Determine expanded candidate count. expandFactor exists to *grow* the
+    // candidate pool to absorb noise-filter losses — never shrink below the
+    // base pool (old Math.min(expanded, ..., base) collapsed it to 2×limit).
     let candidateLimit = baseCandidateLimit;
     if (noiseFilter.enabled) {
       const expanded = Math.ceil(limit * (noiseFilter.expandFactor || 2.0));
-      candidateLimit = Math.min(expanded, noiseFilter.maxExpandedCandidates || 100, baseCandidateLimit);
+      candidateLimit = Math.min(Math.max(baseCandidateLimit, expanded), noiseFilter.maxExpandedCandidates || 100);
     }
 
     // Fetch raw candidates (no JS filtering)
@@ -407,15 +409,26 @@ export class MySqlStore {
     }));
   }
 
-  // ─── SearchRaw (no JS filtering — returns all candidates for reranking) ───
+  // ─── SearchRaw (full-scope cosine scan — returns top-N scored candidates) ───
   /**
-   * Fetch candidates with cosine scores, NO minScore filtering or limiting.
-   * Used by recall.js for composite reranking.
-   * Performance notes: same as search() but returns all candidates without sorting.
+   * Score ALL vectorized rows matching the agent/scope/session/category filters
+   * in JS, then return the top candidateLimit by cosine (sorted descending).
+   * Used by recall.js and searchForRecall for composite reranking.
+   *
+   * Unlike the old behavior (ORDER BY created_at DESC LIMIT n — a recency
+   * window that permanently excluded older memories no matter how similar),
+   * the pool is now similarity-based: candidateLimit means "return top N
+   * after scoring", not "fetch N newest rows".
+   *
+   * Performance notes: full scan of the filtered set (currently ~1.5k rows ×
+   * 1024-dim vectors ≈ tens of MB transfer, sub-second at this scale; MySQL
+   * has no VECTOR INDEX). If the table grows to tens of thousands of rows,
+   * revisit with batching or VECTOR_DISTANCE().
+   *
    * @param {number[]} queryVector
    * @param {object} opts
-   * @param {number} [opts.candidateLimit] — max raw candidates from MySQL (default 50)
-   * @returns {Array<{entry: object, cosine: number}>}
+   * @param {number} [opts.candidateLimit] — top N to return after cosine (default 50)
+   * @returns {Array<{entry: object, cosine: number}>} sorted by cosine descending
    */
   async searchRaw(queryVector, opts = {}) {
     const pool = await this.ensureInitialized();
@@ -446,15 +459,16 @@ export class MySqlStore {
     conditions.push("vector IS NOT NULL");
 
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+    // No time window / LIMIT here: fetch every vectorized row in scope so old
+    // but semantically-relevant memories stay reachable. created_at DESC is kept
+    // only as a stable tie-breaker for the JS cosine sort below.
     const query = `
       SELECT id, text, category, session_key, agent_id, scope_key, source, created_at,
              VECTOR_TO_STRING(vector) AS vec_str
       FROM ${TABLE_NAME}
       ${where}
       ORDER BY created_at DESC
-      LIMIT ?
     `;
-    params.push(candidateLimit);
 
     const queryTimeout = num(this.config, "queryTimeout", DEFAULT_QUERY_TIMEOUT);
     const [rows] = await pool.query(query, params, { timeout: queryTimeout });
@@ -483,7 +497,10 @@ export class MySqlStore {
         cosine,
       });
     }
-    return results;
+
+    // Similarity-ranked pool: sort all scored rows, keep top candidateLimit.
+    results.sort((a, b) => b.cosine - a.cosine);
+    return results.slice(0, candidateLimit);
   }
 
   // ─── Forget (delete by ID) ─────────────────────────────────────────────────

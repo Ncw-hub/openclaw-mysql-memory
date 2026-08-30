@@ -22,6 +22,10 @@ export function recallCacheKey(query, sessionKey, limit, config) {
   const configStr = [
     'nf', nf.enabled ? '1' : '0', nf.expandFactor || '2.0', nf.maxExpandedCandidates || '100',
     'rr', rr.enabled ? '1' : '0', rr.halfLifeDays || '14', rr.weight || '0.15',
+    // P2-③ recall-noise-filters marker: bump configVersion so pre-existing
+    // Redis recall cache entries (which were built without the new filters)
+    // can never bypass them (finding E).
+    'rnf1',
   ].join('|');
   const configVersion = simpleHash(configStr);
   return `mysql-memory:recall:v2:${h}:${sessionKey || "all"}:${limit}:${configVersion}`;

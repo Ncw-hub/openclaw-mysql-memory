@@ -13,6 +13,7 @@
 import { createPool } from "mysql2/promise";
 import { randomUUID } from "node:crypto";
 import { vectorToString, parseVectorString, cosineSimilarity, isNoiseMemory, calculateRecencyBoost } from "../config.js";
+import { isIdentityStatement, isMonologueFragment, isTableDominated } from "../utils/recall-noise-filters.js";
 
 const TABLE_NAME = "memories";
 const DEFAULT_VECTOR_DIM = 768;
@@ -373,6 +374,14 @@ export class MySqlStore {
         if (r.cosine < minScore) return false;
         // Apply noise filter
         if (isNoiseMemory(r.entry.text, r.entry.category)) return false;
+        // P2-③ recall-phase noise filters (second line of defense).
+        // Deliberately category-INDEPENDENT: isNoiseMemory() is short-circuited
+        // by detectCategory (finding A), so identity/monologue/table noise rows
+        // categorized as 'fact' slipped through permanently. Entries stored via
+        // tools (manual memory_store) are NEVER filtered here.
+        const t = r.entry.text || "";
+        if (r.entry.source !== "tool" &&
+            (isIdentityStatement(t) || isMonologueFragment(t) || isTableDominated(t))) return false;
         return true;
       });
     } else {

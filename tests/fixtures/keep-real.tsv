@@ -1,0 +1,10 @@
+10bcf776\t收到！包月制的话确实不用管模型成本，选最强的就行。\n\n当前配置已经很合理了：\n- ? 主代理用 qwen3.6-plus（1.26M上下文）\n- ? 压缩用 kimi-k2.5（省主模型token）\n- ? 本地小模型处理轻量任务（分类、路由）\n- ? TokenJuice 插件已启用\n- ? 循环检测、会话维护都开着\n\n包月制下，性能配置已经到位，不需要调整。还有其他要看的吗？
+1c8f4008\t。Ollama 在 CPU 上跑大模型生成 embedding 确实会慢到超时，导致写入降级或召回无向量。\n\n你去调 GPU/模型部署，配置这边随时等你改好重启。有需要再叫我。
+860a916b\t懂了，是在验证百炼 API 里那个文档提到、但官网没挂出来的 DeepSeek flash 能不能跑通。这种"文档有、控制台没露出"的模型经常是灰度/隐藏型号，直接拿 API 调一下确实是确认它可不可用最干脆的办法。\n\n测出来结果咋样，能正常返回不？要是调通了但想在 OpenClaw 里挂上，或者遇到报错要排查，把模型 ID 和报错发我，我帮你看。
+91b7d994\t好问题。让我查一下 pricing 的配置 schema，看看它对百炼是否有用：\n确认了。`models.pricing.enabled` 的作用是从 **OpenRouter 和 LiteLLM** 的远程价格目录拉取 per-token 成本数据。\n\n百炼（阿里云 Coding Plan）不在这两个目录里，所以开启后也拉不到百炼模型的价格——**保持 `false` 就行**，开了也没用。
+92f45d5e\t所有 8 个 bailian 大模型都没有设置 `thinking` 字段，意味着都走默认值。\n\n**结论**：问题不在模型配置本身，而是 cron 任务运行时**默认带了 `thinking: "low"`**（可能是 openclaw cron 的默认行为），而这些 bailian 模型都不支持 thinking。\n\n**根本解决方案**：以后创建 cron 时显式设 `payload.thinking: "off"`，确保不会触发不兼容警告。
+93ebb402\t明白，Hermes Desktop 对你没用。那对你来说，v0.30.7 值得升级的就一个点：\n\n**OpenAI 兼容 API 的 `/v1/models` 列表对齐修复** — 确保 OpenClaw 通过 ollama 调用本地模型时，返回的可用模型列表和实际拉取的模型一致，避免路由异常。\n\n不过你本地 ollama 主要跑的是 embed 模型和小模型（bge-m3、qwen3.5:2b 等），不是核心推理链路，升级优先级不高。有空顺手更一下就行。
+d2fdb7a1\t收到！以后报告/心跳都用中文。记住了。\n收到！已写入记忆，以后所有报告、心跳、状态汇报全部用中文。
+dabc6431\t昨天整理 wiki 知识库库遇到了很多问题 我重置了 wiki 的知识库 将老的都整理到了E:\\Openclaw\\workspace\\wiki\\main-old\n1. 每次整理都会遇到40次/分钟 的大模型限制 导致总是要等10-15分钟才能重新开始\n2. 扁平化设计 文件过多 导致 插件无法正常搜索 索引\n3. 你让策划看看 老的知识库存档 让他去重 设计下 应该如何整理到 E:\\Openclaw\\workspace\\wiki\\openclaw 新的路径下 给出报告
+efb38da1\t明白。核心结论就是：**模型都支持 thinking，是 OpenClaw ? 百炼的适配层没映射好参数**。以后创建 cron 时不显式传 `thinking` 字段，让它走代理配置的静默降级路径就行了。
+ff1bc123\t找到原因了，所有 token 都在 thinking 字段里。热态首 token 约 380ms，现在我来正式测几轮，然后卸载模型测冷态。\n\n
